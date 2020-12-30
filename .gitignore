@@ -130,3 +130,6 @@ dmypy.json
 
 # Mapbox token
 .mapbox_token
+
+# Visual Studio
+.vscode/
