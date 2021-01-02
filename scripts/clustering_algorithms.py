@@ -39,21 +39,6 @@ def hdbscan_algorithm(X, n_clusters):
     return hdbscan_cluster.labels_ 
 
 
-def evaluation_metrics(X, labels_pred, metric_name):
-    """
-    Function for calculating the accuracy of the Kmeans algorithms
-    """
-
-    s_s = metrics.silhouette_score(X, labels_pred, metric=metric_name)
-    
-    metrics_names = ["Silh_S"]
-    values = [s_s]
-    
-    result = list(zip(metrics_names,values))
-    result = pd.DataFrame(result, columns=['Metric','Value'])
-
-    return result
-
 def agglomerative(X, n_clusters):
     """
     Function for clustering with algorithm Agglomerative clustering.
@@ -68,11 +53,23 @@ def agglomerative(X, n_clusters):
     
 def spectral(X, n_clusters):
     """
-    Function for clustering with algorithm Agglomerative clustering.
+    Function for clustering with algorithm Spectral clustering.
     """
 
-    spectral_cluster = SpectralClustering(n_clusters =n_clusters)
+    spectral_cluster = SpectralClustering(n_clusters=n_clusters)
     spectral_cluster.fit(X)
 
     return spectral_cluster.labels_ 
                                             
+
+def evaluation_metrics(X, labels_pred, metric_name, algorithm):
+    """
+    Function for calculating the accuracy of the algorithms for clustering.
+    """
+    s_s = metrics.silhouette_score(X, labels_pred, metric=metric_name)
+    
+    metricnames = ['Silhoutte Score']
+    values = [s_s]
+    dataframe_with_metrics = pd.DataFrame({'Metric': metricnames, 'Value': values, 'Algorithm':[algorithm]})
+
+    return dataframe_with_metrics
