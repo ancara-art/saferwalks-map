@@ -9,7 +9,7 @@ import os #handling paths and files in python
 
 
 from scripts.read_data import read_firebase, read_schools, merge_data
-from scripts.clustering_algorithms import filter_school, kmeans, hdbscan_algorithm, evaluation_metrics
+from scripts.clustering_algorithms import filter_school, kmeans, hdbscan_algorithm, evaluation_metrics, agglomerative, spectral
 
 my_path = os.path.abspath(os.path.dirname(__file__)) #capturing the current path of this file. 
 
@@ -37,6 +37,8 @@ inline_radioitems = dbc.FormGroup(
             options=[
                 {"label": "K-means", "value": 'kmeans'},
                 {"label": "HDBSCAN", "value": 'hdbscan'},
+                {"label": "Agglomerative", "value": 'agglomerativeclustering'},
+                {"label": "Spectral", "value": 'spectralclustering'}
             ],
             value='kmeans',
             id="selected-algorithm",
@@ -82,6 +84,10 @@ def map_update(ts, selected, algorithm, clusters):
             y = kmeans(dff[['user_long', 'user_lat']], clusters)
         elif algorithm=='hdbscan':
             y = hdbscan_algorithm(dff[['user_long', 'user_lat']], clusters)
+        elif algorithm=='agglomerativeclustering':
+            y = agglomerative(dff[['user_long', 'user_lat']], clusters)  
+        elif algorithm=='spectralclustering':
+            y = spectral(dff[['user_long', 'user_lat']], clusters) 
 
         dff['cluster'] = y.astype(str) #Creating a new column with the labels for plotting by category.
         fig = px.scatter_mapbox(dff.head(1), lon='school_long', lat='school_lat', #color='schoolId',

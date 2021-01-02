@@ -2,6 +2,8 @@ from sklearn.cluster import KMeans
 from sklearn import metrics
 import pandas as pd
 import hdbscan
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import SpectralClustering
 
 
 def filter_school(df, school_Id):
@@ -51,3 +53,26 @@ def evaluation_metrics(X, labels_pred, metric_name):
     result = pd.DataFrame(result, columns=['Metric','Value'])
 
     return result
+
+def agglomerative(X, n_clusters):
+    """
+    Function for clustering with algorithm Agglomerative clustering.
+    """
+
+    agglo_cluster = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward')
+    agglo_cluster.fit(X)
+
+    return agglo_cluster.labels_ 
+                                        
+    
+    
+def spectral(X, n_clusters):
+    """
+    Function for clustering with algorithm Agglomerative clustering.
+    """
+
+    spectral_cluster = SpectralClustering(n_clusters =n_clusters)
+    spectral_cluster.fit(X)
+
+    return spectral_cluster.labels_ 
+                                            
