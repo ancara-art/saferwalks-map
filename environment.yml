@@ -1,0 +1,14 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - firebase
+  - json
+  - pandas
+  - plotly
+  - python_jwt
+  - gcloud
+  - pycryptodome
+  - requests_toolbelt
+  - sklearn
+  - sseclient
