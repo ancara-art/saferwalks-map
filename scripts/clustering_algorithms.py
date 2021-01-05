@@ -30,7 +30,7 @@ def kmeans(X, n_clusters):
 
 def hdbscan_algorithm(X, n_clusters):
     """
-    Function for clustering with algorithm hdbscan.
+    Function for clustering with algorithm hdbscan. Currently we are not using this one.
     """
 
     hdbscan_cluster = hdbscan.HDBSCAN(min_cluster_size=n_clusters, metric = 'haversine')
@@ -68,7 +68,7 @@ def evaluation_metrics(X, labels_pred, metric_name, algorithm):
     """
     s_s = metrics.silhouette_score(X, labels_pred, metric=metric_name)
     
-    metricnames = ['Silhoutte Score']
+    metricnames = ['Silhouette Score']
     values = [s_s]
     dataframe_with_metrics = pd.DataFrame({'Metric': metricnames, 'Value': values, 'Algorithm':[algorithm]})
 

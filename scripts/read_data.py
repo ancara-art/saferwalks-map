@@ -3,7 +3,7 @@ import json
 from firebase import firebase
 import os #handling paths and files in python
 
-def read_firebase(path):
+def read_firebase():
     #Tutorial we followed for reading data in firebase from python: https://morioh.com/p/4dca3ded4cea
     fb = firebase.FirebaseApplication(r'https://safer-walks-default-rtdb.firebaseio.com/', None)
     parents_data = fb.get(r'/RegisteredParents', '')
