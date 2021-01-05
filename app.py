@@ -10,7 +10,7 @@ import plotly.io as pio
 import pandas as pd
 
 from scripts.read_data import read_firebase, read_schools, merge_data
-from scripts.clustering_algorithms import filter_school, kmeans, agglomerative, spectral, evaluation_metrics
+from scripts.clustering_algorithms import filter_school, kmeans, agglomerative, spectral, evaluation_metrics, validate_number_of_points
 
 my_path = os.path.abspath(os.path.dirname(__file__)) #capturing the current path of this file.
 pio.templates.default = "plotly_white" #Theme we used for bar-graph. 
@@ -38,7 +38,7 @@ server = app.server
 ###Layout creation:
 
 #Radio items
-inline_radioitems = dbc.FormGroup(
+input_parameters = dbc.FormGroup(
     [
         dbc.Label("1. Select an algorithm to find children groups:"),
         dbc.RadioItems(
@@ -53,8 +53,11 @@ inline_radioitems = dbc.FormGroup(
         ),
         dbc.Row([
             dbc.Col(dbc.Row([dbc.Col(dbc.Label("2. Select the number of desired groups:"), width='auto'), 
-                    dbc.Col(dbc.Input(placeholder="#", type="number", step=1, min=1, max=5, 
-                    id='number-of-clusters', style=dict(marginLeft='-18px', width='75px')), width='auto')]), width='auto'),
+                    dbc.Col(dbc.Input(placeholder="#", type="number", step=1, min=1, max=10, 
+                    id='number-of-clusters', style=dict(marginLeft='-18px', width='75px')), width='auto'),
+                    dbc.Col(dbc.Alert("The # of groups should be lower than the # of parents for a school!",
+                    color="danger", style=dict(fontSize='15px'), id='danger-alert',dismissable=True,
+                    is_open=False))]), width='auto'),
             dbc.Col(dbc.Button([html.I(className='fa fa-redo-alt'), ' Clear clustering'], 
                                id='clear-clustering', outline=True, color="secondary", 
                                className="mr-1", disabled=True), width='auto')
@@ -75,7 +78,7 @@ inline_radioitems = dbc.FormGroup(
 #Layout
 app.layout = html.Div([dcc.Store(id='selected-school'),
                        html.H1("Safer Walks to Schools Application"),
-                       inline_radioitems,
+                       input_parameters,
                        dbc.Row(
                            [dbc.Col(dcc.Graph(id="map-graph", style=dict(height="350px")),
                            width=7),
@@ -84,10 +87,28 @@ app.layout = html.Div([dcc.Store(id='selected-school'),
 
 
 @app.callback(
-    [Output('map-graph', 'figure'),
-    Output('bar-graph', 'figure')], 
+    Output('danger-alert', 'is_open'),
     [Input('selected-school', 'modified_timestamp')],
     [State('selected-school', 'data'),
+     State('number-of-clusters', 'value')] 
+)
+def show_alert(ts, selected, clusters):
+    #If not clusters is only to prevent the application run this call back in the initializing.
+    if not selected:
+        return False
+    dff = filter_school(df, selected)
+    #Validate number of clusters
+    alert = not validate_number_of_points(dff, clusters)
+
+    return alert
+
+
+#Principal call back of the application for clustering.
+@app.callback(
+    [Output('map-graph', 'figure'),
+    Output('bar-graph', 'figure')], 
+    [Input('selected-school', 'modified_timestamp')], #Trigger of the call back, and also has a variable.
+    [State('selected-school', 'data'), #States are only variables.
      State('selected-algorithm', 'value'),
      State('number-of-clusters', 'value'),
      State('map-graph', 'figure')]
@@ -110,6 +131,10 @@ def map_update(ts, selected, algorithm, clusters, position):
     else:
         dff = filter_school(df, selected)
         name_school = df.loc[df['schoolId']==selected, 'school_name'].unique()[0]
+
+        #Validate number of clusters
+        if not validate_number_of_points(dff, clusters):
+           raise PreventUpdate #Stop the call back execution.
 
         #Cluster algorithms
         y_kmeans = kmeans(dff[['user_long', 'user_lat']], clusters)
