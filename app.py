@@ -9,20 +9,22 @@ import os #handling paths and files in python
 import plotly.io as pio
 import pandas as pd
 
-
 from scripts.read_data import read_firebase, read_schools, merge_data
-from scripts.clustering_algorithms import filter_school, kmeans, hdbscan_algorithm, evaluation_metrics, agglomerative, spectral
+from scripts.clustering_algorithms import filter_school, kmeans, agglomerative, spectral, evaluation_metrics, validate_number_of_points
 
 my_path = os.path.abspath(os.path.dirname(__file__)) #capturing the current path of this file.
-pio.templates.default = "plotly_white" 
+pio.templates.default = "plotly_white" #Theme we used for bar-graph. 
 
-df_parents = read_firebase(my_path)
-df_schools = read_schools(os.path.join('data', 'schools_data.csv'), my_path)
+df_parents = read_firebase() # read data from firebase real time database of parents location. 
+df_schools = read_schools(os.path.join('data', 'schools_data.csv'), my_path) 
 df = merge_data(df_parents, df_schools)
 
-token = open(".mapbox_token").read() #This file must not go in the commit in git.
+#Token for getting access to mapbox services.
+token = open(".mapbox_token").read() #.mapbox_token file must not go in the commit in git.
 px.set_mapbox_access_token(token)
 
+#Initiliazing the app, with some additionals parameters: style-sheets from bootstrap for the layout,
+#and fontawesome for icons. (such as the icon of Clear-clustering button).
 app = dash.Dash(__name__,
                 external_stylesheets=[dbc.themes.BOOTSTRAP,
                                       'https://use.fontawesome.com/releases/v5.12.0/css/all.css'],
@@ -30,10 +32,13 @@ app = dash.Dash(__name__,
                 # see: https://www.w3schools.com/css/css_rwd_viewport.asp for more
                 meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}])
 
+#This is default for dash setting the server. 
 server = app.server
 
+###Layout creation:
+
 #Radio items
-inline_radioitems = dbc.FormGroup(
+input_parameters = dbc.FormGroup(
     [
         dbc.Label("1. Select an algorithm to find children groups:"),
         dbc.RadioItems(
@@ -47,17 +52,25 @@ inline_radioitems = dbc.FormGroup(
             inline=True,         
         ),
         dbc.Row([
-            dbc.Col(dbc.Label("2. Select the number of desired groups:"), width=3),
-            dbc.Col(dbc.Input(placeholder="#", type="number", step=1, min=1, max=5, 
-                              id='number-of-clusters', style=dict(marginLeft='-20px', width='75px')), width=7),
+            dbc.Col(dbc.Row([dbc.Col(dbc.Label("2. Select the number of desired groups:"), width='auto'), 
+                    dbc.Col(dbc.Input(placeholder="#", type="number", step=1, min=1, max=10, 
+                    id='number-of-clusters', style=dict(marginLeft='-18px', width='75px')), width='auto'),
+                    dbc.Col(dbc.Alert("The # of groups should be lower than the # of parents for a school!",
+                    color="danger", style=dict(fontSize='15px'), id='danger-alert',dismissable=True,
+                    is_open=False))]), width='auto'),
             dbc.Col(dbc.Button([html.I(className='fa fa-redo-alt'), ' Clear clustering'], 
                                id='clear-clustering', outline=True, color="secondary", 
                                className="mr-1", disabled=True), width='auto')
                 ],
                 style=dict(marginTop='10px'),
-                #justify='between'
+                justify='between'
                 ),
-        dbc.Label("3. Select a point in the map:"),
+        html.Div([dbc.Label('3. Select a point in the map:'), 
+                  html.I(className='fa fa-graduation-cap', style=dict(color='#9E8C26',  marginLeft='10px', marginRight='5px')),
+                  dbc.Label('Schools'),
+                  html.I(className='fa fa-circle', style=dict(color='gray',  marginLeft='10px', marginRight='5px')),
+                  dbc.Label('Parents')
+                  ]),
     ],
     style=dict(marginBottom='10px')
 )
@@ -65,7 +78,7 @@ inline_radioitems = dbc.FormGroup(
 #Layout
 app.layout = html.Div([dcc.Store(id='selected-school'),
                        html.H1("Safer Walks to Schools Application"),
-                       inline_radioitems,
+                       input_parameters,
                        dbc.Row(
                            [dbc.Col(dcc.Graph(id="map-graph", style=dict(height="350px")),
                            width=7),
@@ -74,10 +87,28 @@ app.layout = html.Div([dcc.Store(id='selected-school'),
 
 
 @app.callback(
-    [Output('map-graph', 'figure'),
-    Output('bar-graph', 'figure')], 
+    Output('danger-alert', 'is_open'),
     [Input('selected-school', 'modified_timestamp')],
     [State('selected-school', 'data'),
+     State('number-of-clusters', 'value')] 
+)
+def show_alert(ts, selected, clusters):
+    #If not clusters is only to prevent the application run this call back in the initializing.
+    if not selected:
+        return False
+    dff = filter_school(df, selected)
+    #Validate number of clusters
+    alert = not validate_number_of_points(dff, clusters)
+
+    return alert
+
+
+#Principal call back of the application for clustering.
+@app.callback(
+    [Output('map-graph', 'figure'),
+    Output('bar-graph', 'figure')], 
+    [Input('selected-school', 'modified_timestamp')], #Trigger of the call back, and also has a variable.
+    [State('selected-school', 'data'), #States are only variables.
      State('selected-algorithm', 'value'),
      State('number-of-clusters', 'value'),
      State('map-graph', 'figure')]
@@ -100,6 +131,10 @@ def map_update(ts, selected, algorithm, clusters, position):
     else:
         dff = filter_school(df, selected)
         name_school = df.loc[df['schoolId']==selected, 'school_name'].unique()[0]
+
+        #Validate number of clusters
+        if not validate_number_of_points(dff, clusters):
+           raise PreventUpdate #Stop the call back execution.
 
         #Cluster algorithms
         y_kmeans = kmeans(dff[['user_long', 'user_lat']], clusters)
@@ -137,7 +172,7 @@ def map_update(ts, selected, algorithm, clusters, position):
     bar_fig.update_layout( 
         margin=dict(l=0, r=0, b=0, t=30),
         showlegend=False,
-        yaxis=dict(title='Silhoutte Score'),
+        yaxis=dict(title='Silhouette Score'),
         xaxis=dict(title='Clustering algorithm')
     )
 

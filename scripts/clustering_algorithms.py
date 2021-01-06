@@ -30,7 +30,7 @@ def kmeans(X, n_clusters):
 
 def hdbscan_algorithm(X, n_clusters):
     """
-    Function for clustering with algorithm hdbscan.
+    Function for clustering with algorithm hdbscan. Currently we are not using this one.
     """
 
     hdbscan_cluster = hdbscan.HDBSCAN(min_cluster_size=n_clusters, metric = 'haversine')
@@ -38,19 +38,15 @@ def hdbscan_algorithm(X, n_clusters):
 
     return hdbscan_cluster.labels_ 
 
-
 def agglomerative(X, n_clusters):
     """
     Function for clustering with algorithm Agglomerative clustering.
     """
-
-    agglo_cluster = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward')
+    agglo_cluster = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward')#Ward and average gives same result. Single linkage is worst.
     agglo_cluster.fit(X)
 
     return agglo_cluster.labels_ 
-                                        
-    
-    
+                                         
 def spectral(X, n_clusters):
     """
     Function for clustering with algorithm Spectral clustering.
@@ -68,8 +64,17 @@ def evaluation_metrics(X, labels_pred, metric_name, algorithm):
     """
     s_s = metrics.silhouette_score(X, labels_pred, metric=metric_name)
     
-    metricnames = ['Silhoutte Score']
+    metricnames = ['Silhouette Score']
     values = [s_s]
     dataframe_with_metrics = pd.DataFrame({'Metric': metricnames, 'Value': values, 'Algorithm':[algorithm]})
 
     return dataframe_with_metrics
+
+def validate_number_of_points(df, n_clusters):
+    """
+    Function for validating that the number of points (parents) for a school, is greater than 
+    the number of clusters given by the user in the input box. 
+    """
+    validation = len(df[['user_long', 'user_lat']].sum(axis=1).unique()) > n_clusters
+
+    return validation
