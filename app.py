@@ -23,6 +23,7 @@ df = merge_data(df_parents, df_schools)
 token = open(".mapbox_token").read() #.mapbox_token file must not go in the commit in git.
 px.set_mapbox_access_token(token)
 
+
 #Initiliazing the app, with some additionals parameters: style-sheets from bootstrap for the layout,
 #and fontawesome for icons. (such as the icon of Clear-clustering button).
 app = dash.Dash(__name__,
