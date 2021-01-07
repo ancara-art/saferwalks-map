@@ -1,5 +1,4 @@
 import pandas as pd
-import json
 from firebase import firebase
 import os #handling paths and files in python
 
