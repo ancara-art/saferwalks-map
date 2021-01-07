@@ -15,10 +15,6 @@ from scripts.clustering_algorithms import filter_school, kmeans, agglomerative, 
 my_path = os.path.abspath(os.path.dirname(__file__)) #capturing the current path of this file.
 pio.templates.default = "plotly_white" #Theme we used for bar-graph. 
 
-df_parents = read_firebase() # read data from firebase real time database of parents location. 
-df_schools = read_schools(os.path.join('data', 'schools_data.csv'), my_path) 
-df = merge_data(df_parents, df_schools)
-
 #Token for getting access to mapbox services.
 token = open(".mapbox_token").read() #.mapbox_token file must not go in the commit in git.
 px.set_mapbox_access_token(token)
@@ -57,11 +53,14 @@ input_parameters = dbc.FormGroup(
                     dbc.Col(dbc.Input(placeholder="#", type="number", step=1, min=1, max=10, 
                     id='number-of-clusters', style=dict(marginLeft='-18px', width='75px')), width='auto'),
                     dbc.Col(dbc.Alert("The # of groups should be lower than the # of parents for a school!",
-                    color="danger", style=dict(fontSize='15px'), id='danger-alert',dismissable=True,
+                    color="danger", style=dict(fontSize='15px'), id='danger-alert', dismissable=True,
                     is_open=False))]), width='auto'),
-            dbc.Col(dbc.Button([html.I(className='fa fa-redo-alt'), ' Clear clustering'], 
-                               id='clear-clustering', outline=True, color="secondary", 
-                               className="mr-1", disabled=True), width='auto')
+            dbc.Col(dbc.Row([dbc.Col(dbc.Button([html.I(className='fa fa-sync'), ' Reload database'], 
+                                        id='reload-database', outline=True, color="info", 
+                                        className="mr-1"), width='auto'),
+                            dbc.Col(dbc.Button([html.I(className='fa fa-trash-alt'), ' Clear clustering'], 
+                                        id='clear-clustering', outline=True, color="secondary", 
+                                        className="mr-1", disabled=True), width='auto')]), width='auto')
                 ],
                 style=dict(marginTop='10px'),
                 justify='between'
@@ -78,6 +77,7 @@ input_parameters = dbc.FormGroup(
 
 #Layout
 app.layout = html.Div([dcc.Store(id='selected-school'),
+                       dcc.Store(id='data-parents'),
                        html.H1("Safer Walks to Schools Application"),
                        input_parameters,
                        dbc.Row(
@@ -87,34 +87,24 @@ app.layout = html.Div([dcc.Store(id='selected-school'),
                        style=dict(margin='30px'))
 
 
-@app.callback(
-    Output('danger-alert', 'is_open'),
-    [Input('selected-school', 'modified_timestamp')],
-    [State('selected-school', 'data'),
-     State('number-of-clusters', 'value')] 
-)
-def show_alert(ts, selected, clusters):
-    #If not clusters is only to prevent the application run this call back in the initializing.
-    if not selected:
-        return False
-    dff = filter_school(df, selected)
-    #Validate number of clusters
-    alert = not validate_number_of_points(dff, clusters)
-
-    return alert
 
 
 #Principal call back of the application for clustering.
 @app.callback(
     [Output('map-graph', 'figure'),
     Output('bar-graph', 'figure')], 
-    [Input('selected-school', 'modified_timestamp')], #Trigger of the call back, and also has a variable.
+    [Input('selected-school', 'modified_timestamp'),#Trigger of the call back, and also has a variable modified_timestamp.
+     Input('data-parents', 'modified_timestamp')], #Trigger of the call back, and also has a variable.
     [State('selected-school', 'data'), #States are only variables.
      State('selected-algorithm', 'value'),
      State('number-of-clusters', 'value'),
-     State('map-graph', 'figure')]
+     State('map-graph', 'figure'),
+     State('data-parents', 'data')]
 )
-def map_update(ts, selected, algorithm, clusters, position): 
+def map_update(ts, ts_df,  selected, algorithm, clusters, position, df_dict): 
+    if not df_dict:
+        raise PreventUpdate
+    df = pd.DataFrame(df_dict)
     if not selected:
         fig = px.scatter_mapbox(df, lon='school_long', lat='school_lat', #color='schoolId',
                                 hover_data=['school_name'], custom_data=['schoolId'])
@@ -194,6 +184,27 @@ def map_update(ts, selected, algorithm, clusters, position):
 
     return fig, bar_fig
 
+#Callback for displaying alert when number clusters is greater than number of parents for a school. 
+@app.callback(
+    Output('danger-alert', 'is_open'),
+    [Input('selected-school', 'modified_timestamp')],
+    [State('selected-school', 'data'),
+     State('number-of-clusters', 'value'),
+     State('data-parents','data')] 
+)
+def show_alert(ts, selected, clusters, df_dict):
+    if not df_dict:
+        raise PreventUpdate
+    df = pd.DataFrame(df_dict)
+    #If not clusters is only to prevent the application run this call back in the initializing.
+    if not selected:
+        return False
+    dff = filter_school(df, selected)
+    #Validate number of clusters
+    alert = not validate_number_of_points(dff, clusters)
+
+    return alert
+
 #Call back where we are storing in the hidden div, the school Id of the point selected
 #In addition, we are enabling and disabling the clear button in this call back.
 @app.callback(
@@ -217,6 +228,18 @@ def update_school(selected):
 )
 def clear_selected(n):
     return None
+
+#Call back 'Reload database'
+@app.callback(
+    Output('data-parents', 'data'),
+    [Input('reload-database', 'n_clicks')]    
+)
+def reload_data(n):
+    df_parents = read_firebase() # read data from firebase real time database of parents location. 
+    df_schools = read_schools(os.path.join('data', 'schools_data.csv'), my_path) 
+    df = merge_data(df_parents, df_schools)
+    return df.to_dict() # We need this so the df can be stored in the div data-parents.
+
 
 #For initializing the application
 if __name__ == "__main__":
